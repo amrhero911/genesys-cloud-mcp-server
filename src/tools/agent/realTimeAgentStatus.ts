@@ -1,9 +1,8 @@
 import { z } from "zod";
 import { createTool, type ToolFactory } from "../utils/createTool.js";
-import type { PresenceApi, UsersApi, RoutingApi } from "purecloud-platform-client-v2";
+import type { UsersApi, RoutingApi } from "purecloud-platform-client-v2";
 
 export interface AgentStatusDependencies {
-  readonly presenceApi: Pick<PresenceApi, "getPresencedefinitions">;
   readonly usersApi: Pick<UsersApi, "getUser" | "getUserRoutingstatus">;
   readonly routingApi: Pick<RoutingApi, "getUserQueues">;
 }
@@ -11,14 +10,13 @@ export interface AgentStatusDependencies {
 const agentStatusSchema = z.object({
   userId: z.string().describe("Agent user ID"),
   includeQueues: z.boolean().default(true).describe("Include queue memberships"),
-  includePresenceHistory: z.boolean().default(false).describe("Include recent presence changes"),
   format: z.enum(['json', 'llm']).default('json').describe("Output format")
 });
 
 export const realTimeAgentStatus: ToolFactory<
   AgentStatusDependencies,
   typeof agentStatusSchema
-> = ({ presenceApi, usersApi, routingApi }) =>
+> = ({ usersApi, routingApi }) =>
   createTool({
     schema: {
       name: "get_realtime_agent_status",
@@ -26,7 +24,7 @@ export const realTimeAgentStatus: ToolFactory<
       description: "Get comprehensive real-time agent status including routing status, presence, queue memberships, and activity timeline",
       paramsSchema: agentStatusSchema,
     },
-    call: async ({ userId, includeQueues, includePresenceHistory, format }) => {
+    call: async ({ userId, includeQueues, format }) => {
       try {
         // Parallel API calls for efficiency
         const [userDetails, routingStatus, queueMemberships] = await Promise.all([
@@ -64,8 +62,7 @@ export const realTimeAgentStatus: ToolFactory<
           })) || [],
           metadata: {
             timestamp: new Date().toISOString(),
-            includeQueues,
-            includePresenceHistory
+            includeQueues
           }
         };
 
